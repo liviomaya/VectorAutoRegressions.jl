@@ -2,3 +2,15 @@ name = "VectorAutoRegressions"
 uuid = "64fb151b-8358-4a28-a6a4-904a7d6ac997"
 authors = ["liviomaya <liviomaya@gmail.com>"]
 version = "0.1.0"
+
+[deps]
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MetropolisHastings = "77b4525b-77e9-4be9-a055-d767757e5808"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
