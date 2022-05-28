@@ -110,6 +110,7 @@ function size(V::StackedVAR)
     Q = size(V.Σ, 1)
     return N, R, Q
 end
+size(v::StackedVAR, i::Int64) = size(v)[i]
 
 function unstack(V::StackedVAR)
     N, R, Q = size(V)
