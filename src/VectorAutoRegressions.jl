@@ -6,11 +6,11 @@ export VAR, setvar, size, isstable, irf, mean, mode, cov, cor, vardecomp,
     MHOptions, kalmanfilter, kalmansmoother, emfill, forecast, cholesky
 
 
-include(pwd() * "/src/f0_header.jl")
-include(pwd() * "/src/f1_struct.jl")
-include(pwd() * "/src/f2_varfunc.jl")
-include(pwd() * "/src/f3_niw.jl")
-include(pwd() * "/src/f4_estimate.jl")
-include(pwd() * "/src/f5_hpestimate.jl")
+include("f0_header.jl")
+include("f1_struct.jl")
+include("f2_varfunc.jl")
+include("f3_niw.jl")
+include("f4_estimate.jl")
+include("f5_hpestimate.jl")
 
 end # module
