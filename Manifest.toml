@@ -512,7 +512,7 @@ version = "0.3.1"
 
 [[MetropolisHastings]]
 deps = ["DataFrames", "Distributions", "LinearAlgebra", "Optim", "Parameters", "PrettyTables", "ProgressMeter", "SpecialFunctions"]
-path = "C:\\Users\\livio\\OneDrive\\Documents\\Academics\\Coding\\Julia\\MetropolisHastings"
+path = "C:\\\\Users\\livio\\\\OneDrive\\\\Documents\\\\Academics\\\\Coding\\\\Julia\\\\MetropolisHastings"
 uuid = "77b4525b-77e9-4be9-a055-d767757e5808"
 version = "0.1.0"
 

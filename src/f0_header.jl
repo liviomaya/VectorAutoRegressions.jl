@@ -2,7 +2,7 @@ using ColorSchemes
 using DataFrames, Distributions
 using LinearAlgebra
 using MetropolisHastings
-using Plots, PrettyTables, ProgressMeter
+using Plots, Plots.PlotMeasures, PrettyTables, ProgressMeter
 using SpecialFunctions, Statistics
 
 import Base.size, Base.map

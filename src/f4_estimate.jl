@@ -470,13 +470,13 @@ function irf(sample::BVARSample, shock::Vector{U};
     end
 
     # median path
-    path = median(irfbyv, dims=3) |> x -> dropdims(x, dims=3)
+    path::Matrix{Float64} = median(irfbyv, dims=3) |> x -> dropdims(x, dims=3)
 
-    lowerbo = mapslices(x -> quantile(x, (1 - cover) / 2), irfbyv, dims=3)
-    lowerbo = lowerbo[:, :, 1]
+    lowerbo3 = mapslices(x -> quantile(x, (1 - cover) / 2), irfbyv, dims=3)
+    lowerbo::Matrix{Float64} = lowerbo3[:, :, 1]
 
-    upperbo = mapslices(x -> quantile(x, 1 - (1 - cover) / 2), irfbyv, dims=3)
-    upperbo = upperbo[:, :, 1]
+    upperbo3 = mapslices(x -> quantile(x, 1 - (1 - cover) / 2), irfbyv, dims=3)
+    upperbo::Matrix{Float64} = upperbo3[:, :, 1]
 
     plot && irfplot(path, lowerbo, upperbo, options) |> display
     return path, lowerbo, upperbo
