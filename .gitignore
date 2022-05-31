@@ -2,4 +2,4 @@ doc/
 misc/
 out/
 src/test.jl
-src/tutorials.jl
+src/tutorial.jl
