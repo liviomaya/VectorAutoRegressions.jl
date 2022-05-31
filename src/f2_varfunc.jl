@@ -156,7 +156,7 @@ function irf(v::H, shock::Vector{U};
     id::AbstractVector{J}=1:size(v, 1),
     cover::Float64=0.0,
     plot::Bool=true,
-    options::Dict{D1,D2}=Dict()) where {H<:AbstractVAR,U<:Real,J<:Real,D1,D2}
+    options::Dict{D1,D2}=Dict(:label => id')) where {H<:AbstractVAR,U<:Real,J<:Real,D1,D2}
 
     maar = ma(v, T)
     maar = mapslices(m -> m * shock, maar, dims=(1, 2))
@@ -189,7 +189,7 @@ irf(v::H, shock::Int64;
     plot::Bool=true,
     options::Dict{D1,D2}=Dict()) where {H<:AbstractVAR,U<:Real,J<:Real,D1,D2} =
     irf(v, collect(I(size(v, 3)))[:, shock], T=T, id=id,
-        cover=cover, options=options)
+        cover=cover, plot=plot, options=options)
 
 
 function vardecomp(v::VAR, T::Int64)

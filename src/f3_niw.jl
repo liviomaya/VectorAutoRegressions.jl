@@ -102,7 +102,21 @@ function logmvgamma(a, N)
 end
 
 """
-    posterior = bayesreg(y, x)
+    posterior = bayesreg(y, x, prior; intercept::Bool=true)
+
+Compute the posterior distribution of the Bayesian multivariate linear regression. The model is
+
+        yₜ = B xₜ + ϵₜ
+        ϵₜ ∼ 𝑁(0, Σ)
+
+The conjugate `prior` is a Normal-Inverse-Wishart distribution.
+
+        Σ    ∼ 𝐼𝑊(Ψ; d)
+        β|Σ  ∼ 𝑁(b, Σ ⊗ Ω)
+        
+where `β = vec(B')`. `Ω` captures prior covariance between coefficients of the same equation.
+
+The `posterior` is also a Normal-Inverse-Wishart distribution.
 """
 function bayesreg(y::VecOrMat{U},
     x::VecOrMat{J},
