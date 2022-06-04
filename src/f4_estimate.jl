@@ -210,7 +210,7 @@ See `Giannone, Lenza & Primiceri (2015)` for details.
 
 - `unitroot::Vector{Bool}`: select which variables are unit roots in the prior; others are white noise.
 
-- `ψ::Vector{Float64}`: mean of the Inverse-Wishart distribution (actual parameter is `ψ (d-n-1)`, where `n` is the size of the number of equations).
+- `ψ::Vector{Float64}`: mean of the Inverse-Wishart distribution (actual IW parameter is `ψ (d-n-1)`, where `n` is the number of equations).
 
 - `d::Float64`:  degrees of freedom of the Inverse-Wishart distribution (greater values correspond to tighter priors).
 
@@ -484,7 +484,7 @@ end
 
 irf(sample::BVARSample,
     shock::Int64;
-    T::Int64,
+    T::Int64=10,
     id=1:size(sample.var[1], 1),
     cover::Float64=0.0,
     plot::Bool=true,
