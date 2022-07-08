@@ -101,7 +101,8 @@ function emfill(data::VecOrMat{<:Real};
     intercept::Bool=true,
     fp::VecOrMat{R}=zeros(size(data))) where {R<:Real}
 
-    @assert count(isnan.(data)) > 0 "No missing data"
+    (!any(isnan.(data))) && return data
+
     itermax = 1000
     tolerance = 1e-7
     #=
