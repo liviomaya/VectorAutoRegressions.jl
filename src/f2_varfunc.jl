@@ -407,7 +407,7 @@ function kalmanfilter(data::VecOrMat{<:Real},
         end
         yproj = Λ[isobs, :] * s[t, :] # projected to be observed based on t-1 information
         y = data[t, isobs] # observed
-        F = Λ[isobs, :] * q[t, :, :] * Λ[isobs, :]' |> makehermitian # t-1 conditional covariance of observables
+        F = Λ[isobs, :] * q[t, :, :] * Λ[isobs, :]' # |> makehermitian # t-1 conditional covariance of observables
 
         # project t based on t information
         invF = inv(F)
