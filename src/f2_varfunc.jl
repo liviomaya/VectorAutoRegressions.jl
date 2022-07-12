@@ -391,9 +391,12 @@ function kalmanfilter(data::VecOrMat{<:Real},
 
     # filter
     for t in 1:T
+        Slast = (t == 1) ? μ0 : S[t-1, :]
+        Qlast = (t == 1) ? Σ0 : Q[t-1, :, :]
+
         # project t based on t-1 information
-        s[t, :] = (t == 1) ? μ0 : (μ .+ Φ * S[t-1, :])
-        q[t, :, :] = (t == 1) ? Σ0 : makehermitian(Φ * Q[t-1, :, :] * Φ' + ΓΣΓ)
+        s[t, :] = μ .+ Φ * Slast
+        q[t, :, :] = makehermitian(Φ * Qlast * Φ' + ΓΣΓ)
         withfp && (s[t, :] .+= fp[t, :])
 
         # define variables observed in period t
