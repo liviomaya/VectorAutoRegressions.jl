@@ -344,10 +344,11 @@ function kaldefaultinitial(v::VAR)::Tuple{Vector{Float64},Matrix{Float64}}
         initialmean = mean(V)
         initialcov = cov(V)
     else
+        P = size(v, 2)
         R = size(V, 2)
         # these array are irrelevant if all variables are observed in the first P periods
         initialmean = zeros(R)
-        initialcov = Float64.(collect(I(R)))
+        initialcov = kron(collect(I(P)), v.Σ)
     end
     return initialmean, initialcov
 end
@@ -356,10 +357,10 @@ end
 function kalmanfilter(data::VecOrMat{<:Real},
     V::StackedVAR,
     fp::VecOrMat{<:Real},
-    initialmean::Vector{<:Real},
-    initialcov::Matrix{<:Real})
+    μ0::Vector{<:Real},
+    Σ0::Matrix{<:Real})
 
-    N, R, Q = size(V)
+    N, R = size(V)[[1, 2]]
     P = Int64(R / N)
     @assert size(data, 2) == N
 
@@ -369,10 +370,10 @@ function kalmanfilter(data::VecOrMat{<:Real},
     # Q = Cov(X(t) | t information)
 
     T = size(data, 1)
-    s = zeros(T, R)
-    S = zeros(T, R)
-    q = zeros(T, R, R)
-    Q = zeros(T, R, R)
+    s::Matrix{Float64} = zeros(T, R)
+    S::Matrix{Float64} = zeros(T, R)
+    q::Array{Float64,3} = zeros(T, R, R)
+    Q::Array{Float64,3} = zeros(T, R, R)
     likelihood::Float64 = 0.0
 
     # unpack parameters
@@ -390,12 +391,9 @@ function kalmanfilter(data::VecOrMat{<:Real},
 
     # filter
     for t in 1:T
-        Slast = (t == 1 ? initialmean : S[t-1, :])
-        Qlast = (t == 1 ? initialcov : Q[t-1, :, :])
-
         # project t based on t-1 information
-        s[t, :] = μ .+ Φ * Slast
-        q[t, :, :] = makehermitian(Φ * Qlast * Φ' + ΓΣΓ)
+        s[t, :] = (t == 1) ? μ0 : (μ .+ Φ * S[t-1, :])
+        q[t, :, :] = (t == 1) ? Σ0 : makehermitian(Φ * Q[t-1, :, :] * Φ' + ΓΣΓ)
         withfp && (s[t, :] .+= fp[t, :])
 
         # define variables observed in period t
@@ -417,22 +415,22 @@ function kalmanfilter(data::VecOrMat{<:Real},
         Q[t, :, :] = (auxm * q[t, :, :] * auxm') .|> myround |> makehermitian
 
         # marginal
-        likelihood -= (count(isobs) / 2) * log(2 * pi)
-        likelihood -= 0.5 * log(det(F))
-        likelihood -= 0.5 * (y - yproj)' * invF * (y - yproj)
+        likelihood -= (1 / 2) * count(isobs) * log(2 * pi)
+        likelihood -= (1 / 2) * log(det(F))
+        likelihood -= (1 / 2) * (y - yproj)' * invF * (y - yproj)
     end
 
     return S, Q, s, q, likelihood
 end
 
 """
-    states, covstates, likelihood = kalmanfilter(data, v; <kwargs>)
+    states, covstates, likelihood = kalmanfilter(X, v; <kwargs>)
 
 Run the Kalman filter.
 
 ### Arguments
 
-- `data::VecOrMat{<:Real}`: array with data points in each row. Missing observations should be entered as `NaN`. It is not necessary to stack `data` in any way.
+- `X::VecOrMat{<:Real}`: array with data points in each row. Missing observations should be entered as `NaN`. It is not necessary to stack `X` in any way.
 
 - `v::VAR`: `VAR` object with model used in to filter.
 
@@ -442,65 +440,70 @@ Run the Kalman filter.
 
 - `covstates::Array{Float64, 3}`: Covariance matrices of the distributions conditional on current information (`covstates[t,:,:]` contains expectation conditional on observation of variables up to period `t`).
 
-- `likelihood::Float64`: Log-likelihood of `data`.
+- `likelihood::Float64`: Log-likelihood of `X`.
 
 ### Keyword Arguments
 
-- `fp::VecOrMat{<:Real}=0`: forcing process. A row index of `fp` and `data`  correspond to the same period. 
+- `fp::VecOrMat{<:Real}=0`: forcing process. A row index of `fp` and `X`  correspond to the same period. 
 
-- `initialmean::Vector{<:Real}=mean(v)`: mean of the probability distribution of the initial condition. If `v` is not stable, default to zero (if the first `P` observations do not have missing values, initial condition does not matter).
+- `μ0::Vector{<:Real}=mean(v)`: mean of the probability distribution of the initial condition. If `v` is not stable, default to zero (if the first `P` observations do not have missing values, initial condition does not matter).
 
-- `initialcov::Matrix{<:Real}=cov(v)`: covariance matrix of the probability distribution of the initial condition. If `v` is not stable, default to identity (if the first `P` observations do not have missing values, initial condition does not matter).
+- `Σ0::Matrix{<:Real}=cov(v)`: covariance matrix of the probability distribution of the initial condition. If `v` is not stable, default to identity (if the first `P` observations do not have missing values, initial condition does not matter).
 
 """
-function kalmanfilter(data::VecOrMat{<:Real}, v::VAR;
-    fp::VecOrMat{T}=zeros(size(data)),
-    initialmean::Vector{<:Real}=kaldefaultinitial(v)[1],
-    initialcov::Matrix{<:Real}=kaldefaultinitial(v)[2]) where {T<:Real}
+function kalmanfilter(X::VecOrMat{<:Real}, v::VAR;
+    fp::VecOrMat{T}=zeros(size(X)),
+    μ0::Vector{<:Real}=kaldefaultinitial(v)[1],
+    Σ0::Matrix{<:Real}=kaldefaultinitial(v)[2]) where {T<:Real}
 
     N = size(v, 1)
-    S, Q, likelihood::Float64 = kalmanfilter(data, stack(v), stackfp(fp, v),
-        initialmean, initialcov)[[1, 2, 5]]
+    S, Q, likelihood::Float64 = kalmanfilter(X, stack(v), stackfp(fp, v),
+        μ0, Σ0)[[1, 2, 5]]
     S::Matrix{Float64} = S[:, 1:N]
     Q::Array{Float64,3} = Q[:, 1:N, 1:N]
     return S, Q, likelihood
 end
 
-function kalmansmoother(data::VecOrMat{<:Real},
+function kalmansmoother(X::VecOrMat{<:Real},
     V::StackedVAR,
     fp::VecOrMat{<:Real},
-    initialmean::Vector{<:Real},
-    initialcov::Matrix{<:Real})
+    μ0::Vector{<:Real},
+    Σ0::Matrix{<:Real})
 
-    S, Q, s, q, ~ = kalmanfilter(data, V, fp, initialmean, initialcov)
+    S, Q, s, q, ~ = kalmanfilter(X, V, fp, μ0, Σ0)
 
     R = size(V, 2)
 
     # M = E(X(t) | 1:T information)
-    T = size(data, 1)
+    # W = cov(X(t) | 1:T information)
+
+    T = size(X, 1)
     M = zeros(T, R)
+    W = zeros(T, R, R)
 
     # unpack parameters
     Φ = V.Φ
 
     # filter 
     M[T, :] = S[T, :]
+    W[T, :, :] = Q[T, :, :]
     for t in T-1:-1:1
         J = Q[t, :, :] * Φ' * pinv(q[t+1, :, :])
         M[t, :] = S[t, :] .+ J * (M[t+1, :] .- s[t+1, :])
+        W[t, :, :] = Q[t, :, :] .+ J * (W[t+1, :, :] .- q[t+1, :, :]) * J'
     end
 
-    return M
+    return M, W
 end
 
 """
-    states = kalmansmoother(data, v; <kwargs>)
+    states = kalmansmoother(X, v; <kwargs>)
 
 Run the Kalman smoother.
 
 ### Arguments
 
-- `data::VecOrMat{<:Real}`: array with data points in each row. Missing observations should be entered as `NaN`. It is not necessary to stack `data` in any way.
+- `X::VecOrMat{<:Real}`: array with data points in each row. Missing observations should be entered as `NaN`. It is not necessary to stack `X` in any way.
 
 - `v::VAR`: `VAR` object with model used in to filter.
 
@@ -510,30 +513,36 @@ Run the Kalman smoother.
 
 ### Keyword Arguments
 
-- `fp::VecOrMat{<:Real}=0`: forcing process. A row index of `fp` and `data`  correspond to the same period. 
+- `fp::VecOrMat{<:Real}=0`: forcing process. A row index of `fp` and `X`  correspond to the same period. 
 
-- `initialmean::Vector{<:Real}=mean(v)`: mean of the probability distribution of the initial condition. If `v` is not stable, default to zero (if the first `P` observations do not have missing values, initial condition does not matter).
+- `μ0::Vector{<:Real}=mean(v)`: mean of the probability distribution of the initial condition. If `v` is not stable, default to zero (if the first `P` observations do not have missing values, initial condition does not matter).
 
-- `initialcov::Matrix{<:Real}=cov(v)`: covariance matrix of the probability distribution of the initial condition. If `v` is not stable, default to identity (if the first `P` observations do not have missing values, initial condition does not matter).
+- `Σ0::Matrix{<:Real}=cov(v)`: covariance matrix of the probability distribution of the initial condition. If `v` is not stable, default to identity (if the first `P` observations do not have missing values, initial condition does not matter).
 
 """
-function kalmansmoother(data::VecOrMat{<:Real}, v::VAR;
-    fp::VecOrMat{T}=zeros(size(data)),
-    initialmean::Vector{<:Real}=kaldefaultinitial(v)[1],
-    initialcov::Matrix{<:Real}=kaldefaultinitial(v)[2]) where {T<:Real}
+function kalmansmoother(X::VecOrMat{<:Real}, v::VAR;
+    fp::VecOrMat{U}=zeros(size(X)),
+    μ0::Vector{<:Real}=kaldefaultinitial(v)[1],
+    Σ0::Matrix{<:Real}=kaldefaultinitial(v)[2]) where {U<:Real}
 
-    N, P = size(v)
+    T = size(X, 1)
+    N, P = size(v)[[1, 2]]
 
     # avoid costly computation of deterministic first part of the data
-    inan = .!prod(.!isnan.(data), dims=2)[:] |> findfirst # first row with NaN
+    inan = .!prod(.!isnan.(X), dims=2)[:] |> findfirst # first row with NaN
+    r1::Matrix{Float64} = zeros(T, N)
+    r2::Array{Float64,3} = zeros(T, N, N)
     if inan <= P
-        M = kalmansmoother(data, stack(v), stackfp(fp, v),
-            initialmean, initialcov)
-        result = M[:, 1:N]
+        M, W = kalmansmoother(X, stack(v), stackfp(fp, v), μ0, Σ0)
+        r1 = M[:, 1:N]
+        r2 = W[:, 1:N, 1:N]
     else
-        M = kalmansmoother(data[inan-P:end, :], stack(v),
-            stackfp(fp[inan-P:end, :], v), initialmean, initialcov)
-        result = [data[1:inan-P-1, :]; M[:, 1:N]]
+        M, W = kalmansmoother(X[inan-P:end, :], stack(v),
+            stackfp(fp[inan-P:end, :], v), μ0, Σ0)
+
+        r1 = [X[1:inan-P-1, :]; M[:, 1:N]]
+        r2 = zeros(T, N, N)
+        r2[inan-P:end, :, :] .= W[:, 1:N, 1:N]
     end
-    return result
+    return r1, r2
 end
