@@ -10,7 +10,6 @@ function estep(X::VecOrMat{Float64}, v::StackedVAR, fp::VecOrMat{<:Real},
 end
 
 function mstep(X::VecOrMat{Float64},
-    v::StackedVAR,
     fp::VecOrMat{<:Real},
     Z::VecOrMat{Float64},
     W::Array{Float64,3},
@@ -61,6 +60,43 @@ function mstep(X::VecOrMat{Float64},
     return nμ, nΦ, nΣ, nμ0
 end
 
+# TODO: Change notation: replace "data" for "X" ets
+
+"""
+    v, Z, W, L = emalgo(X; <kwargs>)
+
+Run the EM algorithm as in Shumway and Stoffer (1982).
+
+### Output 
+
+- `v::VAR`: fitted VAR process.
+
+- `Z::Matrix{Float64}`: Expected value of the distribution of states conditional on all data.
+
+- `W::Matrix{Float64}`: Covariance matrices of the distributions conditional on all data.
+
+- `L::Float64`: Log-Likelihood.
+
+### Arguments
+
+- `X::VecOrMat{<:Real}`: array with sample to be fitted (observations in rows, variables in columns).
+
+### Keyword Arguments
+
+- `P::Int64=1`: number of lags in the VAR.
+
+- `intercept::Bool=true`: whether the VAR model to be fitted contains a constant term.
+
+- `Σ0::Matrix{Float64}`: covariance matrix of the probability distribution of the initial condition. Defaults to identity matrix of size `N × P`, where `N` is the length of each data point (that is, `size(X,2)`).
+
+- `fp::VecOrMat{<:Real}=0`: forcing process. A row index of `fp` and `data`  correspond to the same period.
+
+- `itermax::Int64`: Maximum number of EM iterations.
+
+- `tol::Float64`: tolerance for convergence in log-likelihood.
+
+- `report::Bool`: Set `true` to display distance, number of step and log-likelihood as the algorithm runs.
+"""
 function emalgo(X::VecOrMat{Float64};
     P::Int64=1,
     intercept::Bool=true,
@@ -92,7 +128,7 @@ function emalgo(X::VecOrMat{Float64};
 
         # EM steps
         Z, W, Z0, W0, Wlag, Tlhd = estep(X, V, fpstack, μ0, Σ0)
-        nμ, nΦ, nΣ, nμ0 = mstep(X, V, fpstack, Z, W, Z0, W0, Wlag,
+        nμ, nΦ, nΣ, nμ0 = mstep(X, fpstack, Z, W, Z0, W0, Wlag,
             intercept=intercept)
 
         # build new VAR
