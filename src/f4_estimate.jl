@@ -1,3 +1,131 @@
+########################################################################
+# EM algorithm based on Shumay & Stoffer (1982)
+########################################################################
+
+function estep(X::VecOrMat{Float64}, v::StackedVAR, fp::VecOrMat{<:Real},
+    μ0::Vector{Float64}, Σ0::VecOrMat{Float64})
+
+    Z, W, Z0, W0, Wlag, lhd = kalmansmoother(X, v, fp, μ0, Σ0, getWlag=true)
+    return Z, W, Z0, W0, Wlag, lhd
+end
+
+function mstep(X::VecOrMat{Float64},
+    v::StackedVAR,
+    fp::VecOrMat{<:Real},
+    Z::VecOrMat{Float64},
+    W::Array{Float64,3},
+    Z0::Vector{Float64},
+    W0::Matrix{Float64},
+    Wlag::Array{Float64,3};
+    intercept::Bool=true)
+
+    T, N = size(X)
+    R = size(W, 2)
+
+    # pre-allocate output matrices
+    A = zeros(R + intercept, R + intercept)
+    B = zeros(R, R + intercept)
+    C = zeros(R, R)
+
+    # iterate and compute
+    for t in 1:T
+        fpc = fp[t, :]
+        Zc = Z[t, :] .- fpc
+        Wc = W[t, :, :]
+        Zp = (t == 1) ? Z0 : Z[t-1, :]
+        Wp = (t == 1) ? W0 : W[t-1, :, :]
+        Wlagc = Wlag[t, :, :]
+
+        if intercept
+            Aterm = [1 Zp'; Zp (Zp*Zp'.+Wp)]
+            Bterm = [Zc (Zc * Zp' .+ Wlagc)]
+        else
+            Aterm = Zp * Zp' .+ Wp
+            Bterm = Zc * Zp' .+ Wlagc
+        end
+
+        A .+= Aterm
+        B .+= Bterm
+        C .+= (Zc * Zc') .+ Wc
+    end
+
+    # define next parameter vector
+    Ai = inv(A)
+    Φst = B * Ai
+
+    nμ = intercept ? Φst[:, 1] : zeros(R)
+    nΦ = intercept ? Φst[:, 2:end] : Φst
+    nΣ = (C .- B * Ai * B') / T
+    nμ0 = Z0
+
+    return nμ, nΦ, nΣ, nμ0
+end
+
+function emalgo(X::VecOrMat{Float64};
+    P::Int64=1,
+    intercept::Bool=true,
+    Σ0::Matrix{Float64}=diagm(0 => ones(P * size(X, 2))),
+    fp::VecOrMat{U}=zeros(size(X)),
+    itermax::Int64=1000,
+    tol::Float64=1e-4,
+    report::Bool=true) where {U<:Real}
+
+    # sizes
+    N = size(X, 2)
+    R = N * P
+    @assert R == size(Σ0, 1)
+
+    # Parameter guess
+    μG = zeros(N)
+    ΨG = [zeros(N, N) for _ in 1:P]
+    ΣG = collect(I(N))
+    μ0 = zeros(R)
+    v = setvar(μG, ΨG, ΣG)
+    lhd = -1e10
+
+    # iteration
+    fpstack = stackfp(fp, v)
+    report && (progress = ProgressThresh(tol, "EM Iteration: "))
+    for iter in 1:itermax
+        # stack parameters
+        V = stack(v)
+
+        # EM steps
+        Z, W, Z0, W0, Wlag, Tlhd = estep(X, V, fpstack, μ0, Σ0)
+        nμ, nΦ, nΣ, nμ0 = mstep(X, V, fpstack, Z, W, Z0, W0, Wlag,
+            intercept=intercept)
+
+        # build new VAR
+        nΨunstack = [nΦ[1:N, (p-1)*N.+(1:N)] for p in 1:P]
+        Tv = setvar(nμ[1:N], nΨunstack, nΣ[1:N, 1:N])
+        Tμ0 = nμ0
+
+        # re-calculate distance
+        distance = norm(lhd - Tlhd)
+        (distance < tol) && break
+        report && ProgressMeter.update!(progress, distance,
+            showvalues=[(:Iteration, iter), (:LogLikelihood, Tlhd)])
+
+        # update 
+        v = deepcopy(Tv)
+        μ0 = Tμ0
+        lhd = Tlhd
+
+        # report if convergence failed
+        if (iter == itermax)
+            println("")
+            println("EM algorithm: convergence failed.")
+        end
+    end
+    println("")
+    println("")
+
+    # build result with unstacked kalman smoother
+    Z, W = kalmansmoother(X, v, fp=fp, μ0=μ0, Σ0=Σ0)
+
+    return v, Z, W, lhd
+end
+
 
 # --------------------------------------------------------------------
 # OLS ESTIMATION and EM ALGORITHM

@@ -353,8 +353,7 @@ function kaldefaultinitial(v::VAR)::Tuple{Vector{Float64},Matrix{Float64}}
     return initialmean, initialcov
 end
 
-
-function kalmanfilter(data::VecOrMat{<:Real},
+function kalmanfilter(X::VecOrMat{<:Real},
     V::StackedVAR,
     fp::VecOrMat{<:Real},
     μ0::Vector{<:Real},
@@ -362,19 +361,20 @@ function kalmanfilter(data::VecOrMat{<:Real},
 
     N, R = size(V)[[1, 2]]
     P = Int64(R / N)
-    @assert size(data, 2) == N
+    @assert size(X, 2) == N
 
     # s = E(X(t) | t-1 information)
     # S = E(X(t) | t information)
     # q = Cov(X(t) | t-1 information)
     # Q = Cov(X(t) | t information)
 
-    T = size(data, 1)
+    T = size(X, 1)
     s::Matrix{Float64} = zeros(T, R)
     S::Matrix{Float64} = zeros(T, R)
     q::Array{Float64,3} = zeros(T, R, R)
     Q::Array{Float64,3} = zeros(T, R, R)
     likelihood::Float64 = 0.0
+    K::Matrix{Float64} = zeros(R, N)
 
     # unpack parameters
     μ = V.μ
@@ -383,7 +383,7 @@ function kalmanfilter(data::VecOrMat{<:Real},
     Σ = V.Σ
 
     # relevant objects
-    myround(x::Float64) = round(x, digits=20)
+    # myround(x::Float64) = round(x, digits=20)
     eye = collect(I(R))
     Λ = eye[1:N, :] # select observables
     ΓΣΓ = Γ * Σ * Γ'
@@ -400,14 +400,14 @@ function kalmanfilter(data::VecOrMat{<:Real},
         withfp && (s[t, :] .+= fp[t, :])
 
         # define variables observed in period t
-        isobs = .!isnan.(data[t, :])
+        isobs = .!isnan.(X[t, :])
         if count(isobs) == 0
             S[t, :] = s[t, :]
             Q[t, :, :] = q[t, :, :]
             continue
         end
         yproj = Λ[isobs, :] * s[t, :] # projected to be observed based on t-1 information
-        y = data[t, isobs] # observed
+        y = X[t, isobs] # observed
         F = Λ[isobs, :] * q[t, :, :] * Λ[isobs, :]' # |> makehermitian # t-1 conditional covariance of observables
 
         # project t based on t information
@@ -415,7 +415,7 @@ function kalmanfilter(data::VecOrMat{<:Real},
         K = q[t, :, :] * Λ[isobs, :]' * invF
         S[t, :] = s[t, :] + K * (y .- yproj)
         auxm = eye - K * Λ[isobs, :]
-        Q[t, :, :] = (auxm * q[t, :, :] * auxm') .|> myround |> makehermitian
+        Q[t, :, :] = (auxm * q[t, :, :] * auxm') |> makehermitian
 
         # marginal
         likelihood -= (1 / 2) * count(isobs) * log(2 * pi)
@@ -423,7 +423,7 @@ function kalmanfilter(data::VecOrMat{<:Real},
         likelihood -= (1 / 2) * (y - yproj)' * invF * (y - yproj)
     end
 
-    return S, Q, s, q, likelihood
+    return S, Q, s, q, likelihood, K
 end
 
 """
@@ -471,32 +471,58 @@ function kalmansmoother(X::VecOrMat{<:Real},
     V::StackedVAR,
     fp::VecOrMat{<:Real},
     μ0::Vector{<:Real},
-    Σ0::Matrix{<:Real})
+    Σ0::Matrix{<:Real};
+    getWlag::Bool=false)
 
-    S, Q, s, q, ~ = kalmanfilter(X, V, fp, μ0, Σ0)
+    # getVlag relevant for EM algorithm
 
-    R = size(V, 2)
+    S, Q, s, q, lhd, K = kalmanfilter(X, V, fp, μ0, Σ0)
+
+    N, R = size(V)
 
     # M = E(X(t) | 1:T information)
     # W = cov(X(t) | 1:T information)
 
     T = size(X, 1)
-    M = zeros(T, R)
+    Z = zeros(T, R)
     W = zeros(T, R, R)
+    getWlag && (J = zeros(T, R, R))
 
     # unpack parameters
     Φ = V.Φ
+    eye = collect(I(R))
+    Λ = eye[1:N, :] # select observables
 
     # filter 
-    M[T, :] = S[T, :]
+    Z[T, :] = S[T, :]
     W[T, :, :] = Q[T, :, :]
     for t in T-1:-1:1
-        J = Q[t, :, :] * Φ' * pinv(q[t+1, :, :])
-        M[t, :] = S[t, :] .+ J * (M[t+1, :] .- s[t+1, :])
-        W[t, :, :] = Q[t, :, :] .+ J * (W[t+1, :, :] .- q[t+1, :, :]) * J'
+        Jt = Q[t, :, :] * Φ' * pinv(q[t+1, :, :])
+        getWlag && (J[t, :, :] .= Jt)
+        Z[t, :] = S[t, :] .+ Jt * (Z[t+1, :] .- s[t+1, :])
+        W[t, :, :] = Q[t, :, :] .+ Jt * (W[t+1, :, :] .- q[t+1, :, :]) * Jt'
     end
 
-    return M, W
+    # period-0 distribution
+    J0 = Σ0 * Φ' * pinv(q[1, :, :])
+    Z0::Vector{Float64} = μ0 .+ J0 * (Z[1, :] .- s[1,:])
+    W0::Matrix{Float64} = Σ0 .+ J0 * (Q[1, :, :] .- q[1, :, :]) * J0'
+
+    # compute Vlag[t,:,:] = cov(X(t), X(t-1) | 1:T information)
+    Wlag::Array{Float64,3} = zeros(T, R, R)
+    if getWlag
+        isobs = .!isnan.(X[T, :])
+        Wlag[T, :, :] = (I(R) .- K * Λ[isobs, :]) * Φ * Q[T-1, :, :]
+        for t in T-1:-1:1
+            Jt = (t == 1) ? J0 : J[t-1, :, :]
+            Wlag[t, :, :] .= Q[t, :, :] * Jt' +
+                             J[t, :, :] * (Wlag[t+1, :, :] - Φ * Q[t, :, :]) *
+                             Jt'
+
+        end
+    end
+
+    return Z, W, Z0, W0, Wlag, lhd
 end
 
 """
@@ -525,23 +551,27 @@ Run the Kalman smoother.
 """
 function kalmansmoother(X::VecOrMat{<:Real}, v::VAR;
     fp::VecOrMat{U}=zeros(size(X)),
-    μ0::Vector{<:Real}=kaldefaultinitial(v)[1],
-    Σ0::Matrix{<:Real}=kaldefaultinitial(v)[2]) where {U<:Real}
+    μ0::Vector{G}=kaldefaultinitial(v)[1],
+    Σ0::Matrix{U}=kaldefaultinitial(v)[2]) where {G<:Real,U<:Real}
 
     T = size(X, 1)
     N, P = size(v)[[1, 2]]
+
+    if !any(isnan.(X))
+        return X, zeros(T, N, N)
+    end
 
     # avoid costly computation of deterministic first part of the data
     inan = .!prod(.!isnan.(X), dims=2)[:] |> findfirst # first row with NaN
     r1::Matrix{Float64} = zeros(T, N)
     r2::Array{Float64,3} = zeros(T, N, N)
     if inan <= P
-        M, W = kalmansmoother(X, stack(v), stackfp(fp, v), μ0, Σ0)
+        M, W = kalmansmoother(X, stack(v), stackfp(fp, v), μ0, Σ0)[[1, 2]]
         r1 = M[:, 1:N]
         r2 = W[:, 1:N, 1:N]
     else
         M, W = kalmansmoother(X[inan-P:end, :], stack(v),
-            stackfp(fp[inan-P:end, :], v), μ0, Σ0)
+            stackfp(fp[inan-P:end, :], v), μ0, Σ0)[[1, 2]]
 
         r1 = [X[1:inan-P-1, :]; M[:, 1:N]]
         r2 = zeros(T, N, N)
