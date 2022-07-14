@@ -229,6 +229,7 @@ fitols(data::Vector{<:Real}; P::Int64=1, intercept::Bool=true,
     fp::VecOrMat{R}=zeros(size(data))) where {R<:Real} =
     fitols(mat(data), P=P, intercept=intercept, fp=fp)
 
+# TODO: Delete emfill and eminitialize
 function eminitialize(data::VecOrMat{<:Real})
     datainitial = copy(data)
     for index in findall(isnan.(data))
