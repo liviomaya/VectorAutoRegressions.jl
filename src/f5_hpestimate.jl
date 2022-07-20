@@ -12,7 +12,7 @@ end
 
 
 """
-    sample, marginal, priormode = hpbvar(data, hpprior; <kwargs>)
+    sample, priormode = hpbvar(data, hpprior; <kwargs>)
 
 Sample from the posterior of hyperparameters. Uses the Metropolis-Hastings algorithm.
 
@@ -26,8 +26,6 @@ Sample from the posterior of hyperparameters. Uses the Metropolis-Hastings algor
 
 - `sample::BVARSample`: sample of priors and main parameters (in the form of `VAR` objects). 
 
-- `marginal::Float64`: is the marginal likelihood of the model.
-
 - `priormode::MinnesotaPrior`: prior build from the mode of the hyperparameters' distribution.
 
 ### Keyword Arguments
@@ -40,14 +38,14 @@ Sample from the posterior of hyperparameters. Uses the Metropolis-Hastings algor
 
 - `fp::VecOrMat{<:Real}=0`: forcing process. A row index of `fp` and `data`  correspond to the same period.
 
-- `options::MHOptions`: options for the Metropolis-Hastings algorithm (see `MetropolisHastings` package).
+- `options::S2MHOptions`: options for the two-step Metropolis-Hastings algorithm (see `MetropolisHastings` package).
 """
 function hpbvar(data::VecOrMat{<:Real}, hpprior;
     unitroot::Vector{Bool}=Vector(trues(size(data, 2))),
     P::Int64=1,
     intercept::Bool=true,
     fp::VecOrMat{U}=zeros(size(data)),
-    options::MHOptions=MHOptions()) where {U<:Real}
+    options::S2MHOptions=S2MHOptions()) where {U<:Real}
 
     # set up prior function
     function prior(hp::Vector{<:Real})
@@ -64,9 +62,15 @@ function hpbvar(data::VecOrMat{<:Real}, hpprior;
         return marginal
     end
 
+    # density function
+    function f(hp)
+        p = prior(hp)
+        (p == -Inf) && return -Inf
+        return p + likelihood(hp)
+    end
+
     x0 = median.(hpprior) # usemedian function as mode is not defined for truncated distributions
-    results = mhsampler(x0, prior, likelihood, options=options)
-    marg = results.marginal
+    r, results = s2mhsampler(f, x0, options)
 
     # build BVARSample
     T = size(results.sample)[1]
@@ -87,7 +91,7 @@ function hpbvar(data::VecOrMat{<:Real}, hpprior;
     hpmode = results.mode
     priormode = converthp(hpmode, unitroot)
 
-    return sample, marg, priormode
+    return sample, priormode
 end
 
 """

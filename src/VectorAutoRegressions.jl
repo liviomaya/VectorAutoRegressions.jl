@@ -3,7 +3,7 @@ module VectorAutoRegressions
 export VAR, setvar, size, isstable, irf, mean, mode, cov, cor, vardecomp,
     NormalInvWishart, rand, setniw, fitols, bayesreg, VARNormalInvWishart,
     MinnesotaPrior, setmnprior, bvar, BVARSample, map, hpbvar, shrinkplot,
-    MHOptions, kalmanfilter, kalmansmoother, emalgo, forecast, cholesky
+    S2MHOptions, kalmanfilter, kalmansmoother, emalgo, forecast, cholesky
 
 
 include("f0_header.jl")
