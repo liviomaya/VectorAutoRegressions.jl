@@ -148,13 +148,13 @@ function emalgo(X::VecOrMat{Float64};
         lhd = Tlhd
 
         # report if convergence failed
-        if (iter == itermax)
+        if (iter == itermax) && report
             println("")
             println("EM algorithm: convergence failed.")
         end
     end
-    println("")
-    println("")
+    report && println("")
+    report && println("")
 
     # build result with unstacked kalman smoother
     Z, W = kalmansmoother(X, v, fp=fp, μ0=μ0, Σ0=Σ0)
@@ -448,7 +448,6 @@ function setniw(prior::MinnesotaPrior, P::Int64, intercept::Bool=true)
     return niw
 end
 
-
 function sumcoef(data::VecOrMat{U},
     γ::Float64,
     P::Int64,
@@ -588,10 +587,10 @@ Draw a sample of VAR models from the posterior distribution of parameters. Outpu
 function rand(prior::MinnesotaPrior, posterior::VARNormalInvWishart, T::Int64)
     priorsample = fill(prior, T)
     varsample = Vector{VAR}(undef, T)
-    progress = Progress(T, dt=0.5, barlen=25)
+    # progress = Progress(T, dt=0.5, barlen=25)
     for t in 1:T
         varsample[t] = rand(posterior)
-        next!(progress)
+        # next!(progress)
     end
     sample = BVARSample(priorsample, varsample)
     return sample
