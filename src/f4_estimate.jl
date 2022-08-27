@@ -531,8 +531,8 @@ function bvar(data::VecOrMat{<:Real},
 
     if iscopers
         ycop, xcop = copers(data, prior.δ, P, prior.unitroot, intercept)
-        ydum = issumcoef ? [ycop; ydum] : ysoc
-        xdum = issumcoef ? [xcop; xdum] : xsoc
+        ydum = issumcoef ? [ycop; ydum] : ycop
+        xdum = issumcoef ? [xcop; xdum] : xcop
     end
 
     yadj = isdummy ? [ydum; y] : y
