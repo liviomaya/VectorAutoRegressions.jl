@@ -55,8 +55,8 @@ Create `VAR` object. See documentation of `VAR` for description.
 setvar(μ, Ψ, Γ, Σ) = VAR(vect(μ), vecmat(Ψ), mat(Γ), mat(Σ))
 setvar(μ, Ψ, Σ) = VAR(vect(μ), vecmat(Ψ),
     defaultgamma(length(μ), size(Σ, 1)), mat(Σ))
-setvar(Ψ, Σ) = setvar(zeros(size(Ψ, 1)), vecmat(Ψ), mat(Σ))
-setvar(Ψ::Vector{T}) where {T<:VecOrMat} = setvar(vecmat(Ψ), I(size(Ψ, 1)))
+setvar(Ψ, Σ) = setvar(zeros(size(Σ, 1)), vecmat(Ψ), mat(Σ))
+setvar(Ψ::Vector{T}) where {T<:VecOrMat} = setvar(vecmat(Ψ), I(size(Ψ[1], 1)))
 setvar(Ψ::VecOrMat{T}) where {T<:Real} = setvar(vecmat(Ψ))
 setvar(Ψ::T) where {T<:Real} = setvar(vecmat(Ψ))
 
