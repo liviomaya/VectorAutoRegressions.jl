@@ -164,8 +164,10 @@ function bayesreg(y::VecOrMat{U},
     # calculate marginal
     DΩ = sqrt.(Ω0)
     DΨ = sqrt.(inv(Ψ0))
-    aux1 = LinearAlgebra.Symmetric(DΩ' * X' * X * DΩ)
-    aux2 = LinearAlgebra.Symmetric(DΨ' * (ee + eqparcov) * DΨ)
+    # aux1 = LinearAlgebra.Symmetric(DΩ' * X' * X * DΩ)
+    # aux2 = LinearAlgebra.Symmetric(DΨ' * (ee + eqparcov) * DΨ)
+    aux1 = DΩ' * X' * X * DΩ
+    aux2 = DΨ' * (ee + eqparcov) * DΨ
     eig1 = eigen(aux1).values
     eig2 = eigen(aux2).values
     marginal = -(nlh * T / 2) * log(pi)
