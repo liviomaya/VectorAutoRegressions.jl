@@ -56,8 +56,17 @@ function mstep(X::VecOrMat{Float64},
     nΦ = intercept ? Φst[:, 2:end] : Φst
     nΣ = (C .- B * Ai * B') / T
     nμ0 = Z0
+    nΣ0 = W0
 
-    return nμ, nΦ, nΣ, nμ0
+    # compute likelihood
+    L = 0
+    L -= 0.5 * log(det(nΣ0))
+    L -= 0.5 * tr(inv(nΣ0) * (W0 + (Z0 - nμ0) * (Z0 - nμ0)'))
+
+    L -= (T / 2) * log(det(nΣ))
+    L -= 0.5 * tr(inv(nΣ) * (C - B * Φst' - Φst * B' + Φst * A * Φst'))
+
+    return nμ, nΦ, nΣ, nμ0, nΣ0, L
 end
 
 # TODO: Change notation: replace "data" for "X" ets
@@ -127,14 +136,14 @@ function emalgo(X::VecOrMat{Float64};
         V = stack(v)
 
         # EM steps
-        Z, W, Z0, W0, Wlag, Tlhd = estep(X, V, fpstack, μ0, Σ0)
-        nμ, nΦ, nΣ, nμ0 = mstep(X, fpstack, Z, W, Z0, W0, Wlag,
-            intercept=intercept)
+        Z, W, Z0, W0, Wlag, ~ = estep(X, V, fpstack, μ0, Σ0)
+        nμ, nΦ, nΣ, nμ0, nΣ0, Tlhd = mstep(X, fpstack, Z, W, Z0, W0, Wlag, intercept=intercept)
 
         # build new VAR
         nΨunstack = [nΦ[1:N, (p-1)*N.+(1:N)] for p in 1:P]
         Tv = setvar(nμ[1:N], nΨunstack, nΣ[1:N, 1:N])
         Tμ0 = nμ0
+        TΣ0 = nΣ0
 
         # re-calculate distance
         distance = norm(lhd - Tlhd)
@@ -145,6 +154,7 @@ function emalgo(X::VecOrMat{Float64};
         # update 
         v = deepcopy(Tv)
         μ0 = Tμ0
+        Σ0 = TΣ0
         lhd = Tlhd
 
         # report if convergence failed
