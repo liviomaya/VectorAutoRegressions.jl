@@ -334,6 +334,49 @@ forecast(states::VecOrMat{<:Real}, v::VAR, horizon::Vector{Int64};
     zeros(size(states, 1) + maximum(horizon), size(v, 1))) where {U<:Real} =
     [forecast(states, v, t, fp=fp) for t in horizon]
 
+function fcastextend(data::VecOrMat{<:Real}, V::StackedVAR,
+    periods::Int64, fp::VecOrMat{<:Real})
+
+    data_last = permutedims(data[end, :])
+    fp_last = fp[end-periods:end, :]
+    fcast = copy(data)
+    for p in 1:periods
+        fcast = [fcast; forecast(data_last, V, p, fp_last)]
+    end
+
+    return fcast
+end
+
+"""
+    F = fcastextend(states, v, horizon; fp)
+
+Extend `states` array with forecasts under model `v`.
+
+### Arguments
+
+- `states::VecOrMat{<:Real}`: array with states in each row.
+
+- `v::VAR`: `VAR` object with model used in the forecast.
+
+- `horizon::Int64`: horizon of the forecast. If `horizon=0`, return `states`.
+
+### Output
+
+- `F::Matrix{Float64}`: extended array
+
+### Keyword Argument
+
+- `fp::VecOrMat{<:Real}=0`: forcing process. A row index of `fp` and `states`  correspond to the same period. Therefore `fp` must have at least `horizon` rows more than `states`. 
+"""
+function fcastextend(data::VecOrMat{<:Real}, v::VAR,
+    periods::Int64; fp::VecOrMat{U}=zeros(size(data, 1) + periods, size(v, 1))) where {U<:Real}
+    N, P = size(v)[1:2]
+    fcast = fcastextend(stack(data, P), stack(v), periods,
+        stackfp(fp, v))
+    return fcast[:, 1:P]
+end
+
+
 #--------------------------------------------------------------------
 # KALMAN FILTER AND SMOOTHER
 #--------------------------------------------------------------------
@@ -505,7 +548,7 @@ function kalmansmoother(X::VecOrMat{<:Real},
 
     # period-0 distribution
     J0 = Σ0 * Φ' * pinv(q[1, :, :])
-    Z0::Vector{Float64} = μ0 .+ J0 * (Z[1, :] .- s[1,:])
+    Z0::Vector{Float64} = μ0 .+ J0 * (Z[1, :] .- s[1, :])
     W0::Matrix{Float64} = Σ0 .+ J0 * (Q[1, :, :] .- q[1, :, :]) * J0'
 
     # compute Vlag[t,:,:] = cov(X(t), X(t-1) | 1:T information)

@@ -142,11 +142,15 @@ function bayesreg(y::VecOrMat{U},
     #       β|Σ ∼ 𝑁(b0, Σ ⊗ Ω0)
 
     # add intercept to x, if necessary
-    X = copy(x)
-    intercept && (X = [ones(T) X])
+    if intercept
+        X = [ones(T) x]
+    else
+        X = x
+    end
 
     # Normal component N(b, Σ ⊗ Ω)
-    invΩ0 = diagm(0 => 1 ./ diag(Ω0))
+    # invΩ0 = diagm(0 => 1 ./ diag(Ω0))
+    invΩ0 = inv(Ω0)
     Ω = inv(X' * X + invΩ0) |> makehermitian
     B = Ω * (X' * y + invΩ0 * B0)
     b = B[:]
@@ -162,8 +166,10 @@ function bayesreg(y::VecOrMat{U},
     posterior = setniw(b, Ω, Ψ, d)
 
     # calculate marginal
-    DΩ = sqrt.(Ω0)
-    DΨ = sqrt.(inv(Ψ0))
+    # DΩ = sqrt.(Ω0)
+    # DΨ = sqrt.(inv(Ψ0))
+    DΩ = Matrix(cholesky(Ω0).L)
+    DΨ = Matrix(cholesky(inv(Ψ0)).L)
     # aux1 = LinearAlgebra.Symmetric(DΩ' * X' * X * DΩ)
     # aux2 = LinearAlgebra.Symmetric(DΨ' * (ee + eqparcov) * DΨ)
     aux1 = DΩ' * X' * X * DΩ
