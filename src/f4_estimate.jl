@@ -58,15 +58,16 @@ function mstep(X::VecOrMat{Float64},
     nμ0 = Z0
     nΣ0 = W0
 
-    # compute likelihood
+    #= compute likelihood
     L = 0
     L -= 0.5 * log(det(nΣ0))
     L -= 0.5 * tr(inv(nΣ0) * (W0 + (Z0 - nμ0) * (Z0 - nμ0)'))
 
     L -= (T / 2) * log(det(nΣ))
     L -= 0.5 * tr(inv(nΣ) * (C - B * Φst' - Φst * B' + Φst * A * Φst'))
+    =#
 
-    return nμ, nΦ, nΣ, nμ0, nΣ0, L
+    return nμ, nΦ, nΣ, nμ0, nΣ0
 end
 
 # TODO: Change notation: replace "data" for "X" ets
@@ -136,8 +137,8 @@ function emalgo(X::VecOrMat{Float64};
         V = stack(v)
 
         # EM steps
-        Z, W, Z0, W0, Wlag, ~ = estep(X, V, fpstack, μ0, Σ0)
-        nμ, nΦ, nΣ, nμ0, nΣ0, Tlhd = mstep(X, fpstack, Z, W, Z0, W0, Wlag, intercept=intercept)
+        Z, W, Z0, W0, Wlag, Tlhd = estep(X, V, fpstack, μ0, Σ0)
+        nμ, nΦ, nΣ, nμ0, nΣ0 = mstep(X, fpstack, Z, W, Z0, W0, Wlag, intercept=intercept)
 
         # build new VAR
         nΨunstack = [nΦ[1:N, (p-1)*N.+(1:N)] for p in 1:P]
