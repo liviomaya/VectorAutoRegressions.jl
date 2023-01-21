@@ -38,14 +38,15 @@ Sample from the posterior of hyperparameters. Uses the Metropolis-Hastings algor
 
 - `fp::VecOrMat{<:Real}=0`: forcing process. A row index of `fp` and `data`  correspond to the same period.
 
-- `options::S2MHOptions`: options for the two-step Metropolis-Hastings algorithm (see `MetropolisHastings` package).
+- `options::GAMOptions`: options for the Generalized Adaptive Metropolis algorithm (see `MetropolisHastings` package).
 """
 function hpbvar(data::VecOrMat{<:Real}, hpprior;
     unitroot::Vector{Bool}=Vector(trues(size(data, 2))),
     P::Int64=1,
     intercept::Bool=true,
     fp::VecOrMat{U}=zeros(size(data)),
-    options::S2MHOptions=S2MHOptions()) where {U<:Real}
+    options::GAMOptions=GAMOptions(P=length(hpprior)),
+    hp_initial::Vector{Float64}=median.(hpprior)) where {U<:Real}
 
     # set up prior function
     function prior(hp::Vector{<:Real})
@@ -69,8 +70,8 @@ function hpbvar(data::VecOrMat{<:Real}, hpprior;
         return p + likelihood(hp)
     end
 
-    x0 = median.(hpprior) # usemedian function as mode is not defined for truncated distributions
-    r, results = s2mhsampler(f, x0, options)
+    # run GAM sampler
+    results = gamsampler(f, hp_initial, options)
 
     # build BVARSample
     T = size(results.sample)[1]
