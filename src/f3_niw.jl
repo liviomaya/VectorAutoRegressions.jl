@@ -171,8 +171,8 @@ function bayesreg(y::VecOrMat{U},
     # calculate marginal
     # DΩ = sqrt.(Ω0)
     # DΨ = sqrt.(inv(Ψ0))
-    DΩ = Matrix(cholesky(Ω0).L)
-    DΨ = Matrix(cholesky(inv(Ψ0)).L)
+    DΩ = Matrix(cholesky(makehermitian(Ω0)).L)
+    DΨ = Matrix(cholesky(makehermitian(inv(Ψ0))).L)
     # aux1 = LinearAlgebra.Symmetric(DΩ' * X' * X * DΩ)
     # aux2 = LinearAlgebra.Symmetric(DΨ' * (ee + eqparcov) * DΨ)
     aux1 = DΩ' * X' * X * DΩ
