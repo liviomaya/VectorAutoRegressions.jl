@@ -39,6 +39,8 @@ Sample from the posterior of hyperparameters. Uses the Metropolis-Hastings algor
 - `fp::VecOrMat{<:Real}=0`: forcing process. A row index of `fp` and `data`  correspond to the same period.
 
 - `options::GAMOptions`: options for the Generalized Adaptive Metropolis algorithm (see `MetropolisHastings` package).
+
+- `hp_initial`: default = median(hpprior)
 """
 function hpbvar(data::VecOrMat{<:Real}, hpprior;
     unitroot::Vector{Bool}=Vector(trues(size(data, 2))),

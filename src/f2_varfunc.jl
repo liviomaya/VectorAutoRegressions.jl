@@ -54,9 +54,26 @@ mean(v::VAR) = mean(stack(v))[1:size(v, 1)]
 function cov(v::StackedVAR)
     @assert isstable(v) "System not covariance-stationary."
     R = size(v, 2)
-    covvec = (I(R^2) .- kron(v.Φ, v.Φ)) \ (v.Γ*v.Σ*v.Γ')[:]
-    V = reshape(covvec, R, R)
-    V = round.(V, digits=10) |> makehermitian
+
+    if R <= 10
+        covvec = (I(R^2) .- kron(v.Φ, v.Φ)) \ (v.Γ*v.Σ*v.Γ')[:]
+        V = reshape(covvec, R, R)
+        V = round.(V, digits=10) |> makehermitian
+    else
+        V = v.Γ * v.Σ * v.Γ'
+        itermax = 1000
+        tol = 1e-7
+        converged = false
+        for t in 1:itermax
+            TV = v.Φ * V * v.Φ' .+ v.Γ * v.Σ * v.Γ'
+            dist = norm(TV .- V)
+            (dist < tol) && (converged = true)
+            converged && break
+            V = TV
+        end
+        V = makehermitian(V)
+    end
+
     return V
 end
 
@@ -94,26 +111,57 @@ condcov(v::VAR, T::Int64) = condcov(stack(v), T)[1:size(v, 1), 1:size(v, 1), :]
 
 
 function irfplot(path, lowerbo, upperbo, options)
-
     T, N = size(path)
 
-    fig = plot(1:T, path;
-        xlim=(1, Inf),
-        size=120 * [3, 3],
-        fillalpha=0.2,
-        markershape=:circle,
-        msw=0,
+    # fix x ticks
+    if T <= 11
+        xticks = 0:T-1
+    else
+        T0 = T
+        while all([rem(T0 - 1, n) != 0 for n in 3:5])
+            T0 = T0 - 1
+        end
+        if rem(T0 - 1, 5) == 0
+            step = (T0 - 1) / 5
+        elseif rem(T0 - 1, 4) == 0
+            step = (T0 - 1) / 4
+        elseif rem(T0 - 1, 3) == 0
+            step = (T0 - 1) / 3
+        end
+        xticks = 0:step:T0
+    end
+
+    fig = hline([0.0],
+        label=:none,
+        color=:black,
+        alpha=1
+    )
+
+    plot!(fig, 0:T-1, path;
         color_palette=:seaborn_bright,
+        size=(400, 300),
+        lw=2,
+        color=permutedims(1:N),
+        xticks=xticks,
+        fillalpha=0.2,
+        titlefontsize=11,
+        tickfontsize=10,
+        legendfontsize=10,
+        labelfontsize=10,
+        markershape=:circle,
+        msw=0.5,
+        markersize=5,
+        gridalpha=0.5,
+        gridlinestyle=:dash,
+        gridlinewidth=1,
         options...
     )
 
-    plot!(fig, lowerbo, fillrange=upperbo,
+    plot!(fig, 0:T-1, lowerbo, fillrange=upperbo,
         label=:none,
         lw=0,
         fillalpha=0.2,
         color=permutedims(1:N))
-
-    hline!(fig, [0.0], label=:none, color=:black, alpha=0.15)
 
     return fig
 end
@@ -141,7 +189,7 @@ Return the response (i.e. change in expectation) of variables in the VAR `v` to 
 
 ### Keyword Arguments
 
-- `T::Int64=10`: length of computed response.
+- `T::Int64=11`: length of computed response.
     
 - `id::AbstractVector=1:size(v,1)`: index of variables to which responses are calculated.
     
@@ -152,7 +200,7 @@ Return the response (i.e. change in expectation) of variables in the VAR `v` to 
 - `options::Dict`: options to figure (see documentation to `Plots` package). 
 """
 function irf(v::H, shock::Vector{U};
-    T::Int64=10,
+    T::Int64=11,
     id::AbstractVector{J}=1:size(v, 1),
     cover::Float64=0.0,
     plot::Bool=true,
@@ -177,13 +225,13 @@ function irf(v::H, shock::Vector{U};
 
     lowerbo::Matrix{Float64} = irfdata .- ribbon
     upperbo::Matrix{Float64} = irfdata .+ ribbon
-    plot && irfplot(irfdata, lowerbo, upperbo, options) |> display
+    plot && display(irfplot(irfdata, lowerbo, upperbo, options))
 
     return irfdata, lowerbo, upperbo
 end
 
 irf(v::H, shock::Int64;
-    T::Int64=10,
+    T::Int64=11,
     id::AbstractVector{J}=1:size(v, 1),
     cover::Float64=0.0,
     plot::Bool=true,

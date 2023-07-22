@@ -136,6 +136,9 @@ function bayesreg(y::VecOrMat{U},
     Ψ0 = prior.Ψ
     d0 = prior.d
     B0 = reshape(b0, nrh, nlh)
+    # ensure matrices are at least close to symmetric
+    @assert maximum(abs.(Ψ0 .- Ψ0')) < 1e-9 "Prior matrix Ψ must be diagonal"
+    @assert maximum(abs.(Ω0 .- Ω0')) < 1e-9 "Prior matrix Ω must be diagonal"
 
     # prior: 
     #       Σ ∼ 𝐼𝑊(Ψ0, d0)
