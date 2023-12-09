@@ -294,7 +294,7 @@ function emfill(data::VecOrMat{<:Real};
     progress = ProgressThresh(tolerance, "Minimizing:")
     for iter in 1:itermax
         expdata = (iter == 1) ? eminitialize(data) :
-                  kalmansmoother(data, v, fp=fp)
+                  kalmansmoother(data, v, fp=fp)[1]
         maxv = fitols(expdata, P=P, intercept=intercept, fp=fp)
         distance = norm(expdata .- statedata, 2)
         (distance < tolerance) && break
@@ -664,6 +664,6 @@ irf(sample::BVARSample,
     id=1:size(sample.var[1], 1),
     cover::Float64=0.0,
     plot::Bool=true,
-    options::Dict{D1,D2}=Dict(:label => id')) where {U<:Real,D1,D2} =
+    options::Dict{D1,D2}=Dict(:label => id')) where {D1,D2} =
     irf(sample, collect(I(size(sample.var[1], 3)))[:, shock], T=T, id=id,
         cover=cover, plot=plot, options=options)

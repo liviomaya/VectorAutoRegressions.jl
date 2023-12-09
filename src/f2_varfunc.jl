@@ -235,7 +235,7 @@ irf(v::H, shock::Int64;
     id::AbstractVector{J}=1:size(v, 1),
     cover::Float64=0.0,
     plot::Bool=true,
-    options::Dict{D1,D2}=Dict()) where {H<:AbstractVAR,U<:Real,J<:Real,D1,D2} =
+    options::Dict{D1,D2}=Dict()) where {H<:AbstractVAR,J<:Real,D1,D2} =
     irf(v, collect(I(size(v, 3)))[:, shock], T=T, id=id,
         cover=cover, plot=plot, options=options)
 

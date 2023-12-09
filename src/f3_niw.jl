@@ -179,7 +179,7 @@ function bayesreg(y::VecOrMat{U},
     aux2 = DΨ' * (ee + eqparcov) * DΨ
     eig1 = eigen(aux1).values
     eig2 = eigen(aux2).values
-    marginal = -(nlh * T / 2) * log(pi)
+    marginal::Float64 = -(nlh * T / 2) * log(pi)
     marginal += logmvgamma((T + d0) / 2, nlh) - logmvgamma(d0 / 2, nlh)
     marginal += -(T / 2) * log(det(Ψ0))
     marginal += -(nlh / 2) * sum(log.(1 .+ eig1))

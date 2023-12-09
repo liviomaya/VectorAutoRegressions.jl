@@ -1,7 +1,7 @@
 using ColorSchemes
 using DataFrames, Distributions
 using LinearAlgebra
-using MetropolisHastings
+# using MetropolisHastings
 using Plots, Plots.PlotMeasures, PrettyTables, ProgressMeter
 using SpecialFunctions, Statistics
 
